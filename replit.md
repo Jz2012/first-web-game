@@ -31,11 +31,14 @@ A multiplayer ping pong game built with Flask and Socket.IO for real-time gamepl
 ```
 
 ## Key Features
-- Single-player game with AI opponent
+- Single-player game with predictive AI opponent
+- Three difficulty levels (Easy, Medium, Hard)
+- Advanced ball trajectory prediction with wall bounce simulation
 - Canvas-based game rendering
 - Score tracking for both players
 - Keyboard controls for player (Arrow Up/Down)
-- AI-controlled opponent that follows the ball
+- Smart AI that predicts where the ball will land
+- Difficulty-based AI behavior (speed, reaction time, accuracy)
 - Ball physics with paddle collision detection
 - Automatic ball reset after scoring
 
@@ -52,8 +55,16 @@ A multiplayer ping pong game built with Flask and Socket.IO for real-time gamepl
 - Added allow_unsafe_werkzeug flag for development server
 - Created .gitignore for Python projects
 - Set up workflow for automatic server startup
-- Added AI opponent that automatically tracks and follows the ball
-- AI speed tuned to 3.5 (vs player 5.0) for balanced difficulty
+- Implemented advanced AI with ball trajectory prediction
+  - AI simulates ball path including wall bounces
+  - Predicts where ball will land on its side
+  - Moves to intercept position proactively
+- Added three difficulty levels with UI selector
+  - **Easy**: Slower speed (2.5), longer reaction time (15 frames), high error rate
+  - **Medium**: Moderate speed (3.5), medium reaction time (8 frames), some errors
+  - **Hard**: Fast speed (5.0), quick reaction time (3 frames), minimal errors
+- Added position clamping for accurate physics simulation
+- Implemented reaction delays and prediction errors for realistic AI behavior
 
 ## Running the Project
 The Flask server is configured to run automatically via the Replit workflow system. The game will be accessible through the Replit webview on port 5000.
