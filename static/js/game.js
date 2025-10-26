@@ -1,10 +1,10 @@
-git remote add replit https://replit.com/@username/replname.gitconst socket = io();
+const socket = io();
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Game settings
-const CANVAS_WIDTH = 1000;
-const CANVAS_HEIGHT = 600;
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 400;
 
 // Set canvas size
 canvas.width = CANVAS_WIDTH;
@@ -16,18 +16,19 @@ let difficulty = 'medium'; // 'easy', 'medium', 'hard'
 
 // Game objects
 const paddle = {
-    width: 15,
-    height: 80,
-    speed: 8
+    width: 10,
+    height: 60,
+    speed: 6
 };
 
 const ball = {
-    size: 12,
-    speed: 6,
-    dx: 6,
-    dy: 6,
+    size: 8,
+    baseSpeed: 5,    // Base speed that we'll return to after hits
+    speed: 5,        // Current speed
+    dx: 5,          // Horizontal speed
+    dy: 5,          // Vertical speed
     isChopped: false,
-    lastHitBy: null // 'player1' or 'player2'
+    lastHitBy: null  // 'player1' or 'player2'
 };
 
 let gameState = {
@@ -121,33 +122,66 @@ function updateAIDifficulty() {
 }
 
 // AI movement
+function predictBallPosition() {
+    // Only predict if ball is moving towards AI
+    if (ball.dx <= 0) return gameState.ball.y;
+    
+    // Calculate time to reach paddle
+    const distanceToTravel = canvas.width - paddle.width - gameState.ball.x;
+    const timeToReach = distanceToTravel / Math.abs(ball.dx);
+    
+    // Calculate Y position when ball reaches paddle
+    let predictedY = gameState.ball.y + (ball.dy * timeToReach);
+    
+    // Account for bounces
+    const bounces = Math.floor(Math.abs(predictedY) / canvas.height);
+    if (bounces > 0) {
+        const remainder = predictedY % canvas.height;
+        predictedY = (bounces % 2 === 0) ? remainder : canvas.height - remainder;
+    }
+    
+    return Math.min(Math.max(predictedY, 0), canvas.height);
+}
+
 function updateAI() {
     if (gameMode === 'ai') {
-        // AI follows the ball with some delay
-        const targetY = gameState.ball.y - paddle.height / 2;
+        const predictedY = predictBallPosition();
+        const targetY = predictedY - paddle.height / 2;
         const currentY = gameState.player2.y;
         const diff = targetY - currentY;
         
-        // Add some randomness and delay based on difficulty
         let aiSpeed = paddle.speed;
+        let reactionDelay = 1.0;
+        
         switch(difficulty) {
             case 'easy':
                 aiSpeed *= 0.5;
-                if (Math.abs(diff) > paddle.height) {
-                    gameState.player2.y += Math.sign(diff) * aiSpeed;
+                reactionDelay = 0.3;
+                // Sometimes move in wrong direction on easy
+                if (Math.random() < 0.2) {
+                    gameState.player2.y -= Math.sign(diff) * aiSpeed;
+                    return;
                 }
                 break;
             case 'medium':
                 aiSpeed *= 0.7;
-                if (Math.abs(diff) > paddle.height / 2) {
-                    gameState.player2.y += Math.sign(diff) * aiSpeed;
-                }
+                reactionDelay = 0.6;
                 break;
             case 'hard':
-                if (Math.abs(diff) > paddle.height / 4) {
-                    gameState.player2.y += Math.sign(diff) * aiSpeed;
-                }
+                aiSpeed *= 0.9;
+                reactionDelay = 0.9;
                 break;
+        }
+        
+        // Only move if the ball is far enough from the predicted position
+        if (Math.abs(diff) > paddle.height / 4) {
+            const moveAmount = Math.sign(diff) * aiSpeed * reactionDelay;
+            const newY = gameState.player2.y + moveAmount;
+            
+            // Keep paddle within canvas bounds
+            if (newY >= 0 && newY + paddle.height <= canvas.height) {
+                gameState.player2.y = newY;
+            }
         }
     }
 }
@@ -181,18 +215,28 @@ function update() {
         updateAI();
     }
 
-    // Move ball
-    gameState.ball.x += ball.dx;
-    gameState.ball.y += ball.dy;
+    // Calculate next ball position
+    let nextX = gameState.ball.x + ball.dx;
+    let nextY = gameState.ball.y + ball.dy;
 
-    // Ball collision with top and bottom
-    if (gameState.ball.y <= 0 || gameState.ball.y >= canvas.height) {
-        ball.dy *= -1;
+    // Ball collision with top and bottom walls
+    if (nextY - ball.size/2 <= 0) {
+        nextY = ball.size/2;
+        ball.dy = Math.abs(ball.dy); // Ensure ball moves downward
+    } else if (nextY + ball.size/2 >= canvas.height) {
+        nextY = canvas.height - ball.size/2;
+        ball.dy = -Math.abs(ball.dy); // Ensure ball moves upward
     }
 
-    // Ball collision with paddles
+    // Update ball position
+    gameState.ball.x = nextX;
+    gameState.ball.y = nextY;
+
+    // Check paddle collisions
     if (checkPaddleCollision()) {
-        ball.dx *= -1;
+        // Ball direction is handled in checkPaddleCollision
+        // Reverse horizontal direction and apply speed changes
+        nextX = gameState.ball.x; // Use updated position after collision
     }
 
     // Ball out of bounds
@@ -211,10 +255,11 @@ function checkPaddleCollision() {
     const smashSpeedMultiplier = 1.5; // How much faster the ball goes when smashed
     const chopSpeedMultiplier = 0.6;  // How much slower the ball goes when chopped
     
-    // Left paddle (Player 1)
-    if (gameState.ball.x <= paddle.width &&
-        gameState.ball.y >= gameState.player1.y &&
-        gameState.ball.y <= gameState.player1.y + paddle.height) {
+    // Left paddle (Player 1) collision check
+    if (gameState.ball.x <= paddle.width && // Ball reaches paddle x position
+        gameState.ball.x >= 0 && // Ball hasn't gone past paddle
+        gameState.ball.y + ball.size/2 >= gameState.player1.y && // Ball bottom edge >= paddle top
+        gameState.ball.y - ball.size/2 <= gameState.player1.y + paddle.height) { // Ball top edge <= paddle bottom
         
         // Check if this is a chopped ball that wasn't returned with a chop
         if (ball.isChopped && ball.lastHitBy === 'player2' && !keys.ArrowLeft) {
@@ -229,26 +274,34 @@ function checkPaddleCollision() {
         // Apply smash if right arrow is pressed
         if (keys.ArrowRight) {
             ball.isChopped = false;
-            ball.speed *= smashSpeedMultiplier;
-            ball.dx = Math.abs(ball.dx) * smashSpeedMultiplier; // Ensure it goes right
+            // Apply smash: increase speed and ensure direction
+            ball.speed = ball.baseSpeed * smashSpeedMultiplier;
+            ball.dx = Math.abs(ball.dx) * smashSpeedMultiplier;
+            ball.dy = ball.dy * smashSpeedMultiplier;
         }
         // Apply chop if left arrow is pressed
         else if (keys.ArrowLeft) {
             ball.isChopped = true;
-            ball.speed *= chopSpeedMultiplier;
-            ball.dx = Math.abs(ball.dx) * chopSpeedMultiplier; // Ensure it goes right
+            // Apply chop: decrease speed and ensure direction
+            ball.speed = ball.baseSpeed * chopSpeedMultiplier;
+            ball.dx = Math.abs(ball.dx) * chopSpeedMultiplier;
+            ball.dy = ball.dy * chopSpeedMultiplier;
         } else {
             ball.isChopped = false;
-            ball.speed = 5; // Reset to normal speed for regular hits
-            ball.dx = Math.abs(ball.dx); // Ensure it goes right
+            // Regular hit: reset to base speed
+            ball.speed = ball.baseSpeed;
+            ball.dx = Math.abs(ball.dx);
+            // Maintain current y direction but normalize to base speed
+            ball.dy = Math.sign(ball.dy) * ball.baseSpeed;
         }
         return true;
     }
     
-    // Right paddle (Player 2)
-    if (gameState.ball.x >= canvas.width - paddle.width &&
-        gameState.ball.y >= gameState.player2.y &&
-        gameState.ball.y <= gameState.player2.y + paddle.height) {
+    // Right paddle (Player 2) collision check
+    if (gameState.ball.x >= canvas.width - paddle.width && // Ball reaches paddle x position
+        gameState.ball.x <= canvas.width && // Ball hasn't gone past paddle
+        gameState.ball.y + ball.size/2 >= gameState.player2.y && // Ball bottom edge >= paddle top
+        gameState.ball.y - ball.size/2 <= gameState.player2.y + paddle.height) { // Ball top edge <= paddle bottom
         
         // Check if this is a chopped ball that wasn't returned with a chop
         if (ball.isChopped && ball.lastHitBy === 'player1' && !keys.a) {
@@ -270,7 +323,7 @@ function checkPaddleCollision() {
         else if (keys.a) {
             ball.isChopped = true;
             ball.speed *= chopSpeedMultiplier;
-            ball.dx = -Math.abs(ball.dx) * chopSpeedMultiplier; // Ensure it goes left
+            ball.dx = -Math.abs(ball.dx) * chopSpeedMultiplier; // Go left on chop for right paddle
         } else {
             ball.isChopped = false;
             ball.speed = 5; // Reset to normal speed for regular hits
@@ -285,9 +338,11 @@ function checkPaddleCollision() {
 function resetBall() {
     gameState.ball.x = canvas.width / 2;
     gameState.ball.y = canvas.height / 2;
-    ball.speed = 5; // Reset ball speed to default
-    ball.dx = (Math.random() > 0.5 ? 1 : -1) * ball.speed;
-    ball.dy = (Math.random() > 0.5 ? 1 : -1) * ball.speed;
+    ball.speed = ball.baseSpeed; // Reset to base speed
+    // Set initial direction with slightly randomized angle
+    const angle = (Math.random() * Math.PI/4) - Math.PI/8; // Random angle between -22.5 and 22.5 degrees
+    ball.dx = (Math.random() > 0.5 ? 1 : -1) * (ball.speed * Math.cos(angle));
+    ball.dy = (Math.random() > 0.5 ? 1 : -1) * (ball.speed * Math.sin(angle));
     ball.isChopped = false;
     ball.lastHitBy = null;
 }
