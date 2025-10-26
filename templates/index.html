@@ -8,14 +8,25 @@
 </head>
 <body>
     <div class="game-container">
-        <div id="difficulty-selector">
-            <label>Difficulty:</label>
-            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
-            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
-            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+        <div id="controls-panel">
+            <div id="mode-selector">
+                <label>Mode:</label>
+                <button class="mode-btn active" data-mode="ai">vs AI</button>
+                <button class="mode-btn" data-mode="multiplayer">Multiplayer</button>
+            </div>
+            <div id="difficulty-selector">
+                <label>Difficulty:</label>
+                <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+                <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+                <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+            </div>
         </div>
         <div id="score">
             <span id="player1-score">0</span> - <span id="player2-score">0</span>
+        </div>
+        <div id="controls-help">
+            <span>Player 1: ↑↓ Move, →/D Smash</span>
+            <span id="player2-help" class="hidden">Player 2: W/S Move</span>
         </div>
         <canvas id="gameCanvas"></canvas>
     </div>

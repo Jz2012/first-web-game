@@ -46,8 +46,11 @@ const difficulties = {
 };
 
 let currentDifficulty = 'easy';
+let gameMode = 'ai'; // 'ai' or 'multiplayer'
 let aiReactionTimer = 0;
 let aiTargetY = canvas.height / 2;
+let canSmash = true;
+let smashCooldown = 0;
 
 let gameState = {
     player1: {
@@ -67,26 +70,43 @@ let gameState = {
 // Input handling
 const keys = {
     ArrowUp: false,
-    ArrowDown: false
+    ArrowDown: false,
+    ArrowRight: false,
+    KeyD: false,
+    KeyW: false,
+    KeyS: false
 };
 
 document.addEventListener('keydown', (e) => {
-    if (e.key in keys) {
+    const keyCode = e.code || e.key;
+    
+    if (keyCode in keys) {
+        if (!keys[keyCode]) {
+            keys[keyCode] = true;
+            
+            // Handle smash
+            if ((keyCode === 'ArrowRight' || keyCode === 'KeyD') && canSmash) {
+                performSmash();
+            }
+        }
+    }
+    
+    // Legacy support for arrow keys
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         keys[e.key] = true;
-        socket.emit('paddle_move', {
-            key: e.key,
-            pressed: true
-        });
     }
 });
 
 document.addEventListener('keyup', (e) => {
-    if (e.key in keys) {
+    const keyCode = e.code || e.key;
+    
+    if (keyCode in keys) {
+        keys[keyCode] = false;
+    }
+    
+    // Legacy support for arrow keys
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         keys[e.key] = false;
-        socket.emit('paddle_move', {
-            key: e.key,
-            pressed: false
-        });
     }
 });
 
@@ -96,6 +116,24 @@ socket.on('paddle_update', (data) => {
         gameState.player2.y = data.y;
     }
 });
+
+// Smash mechanic
+function performSmash() {
+    if (!canSmash || smashCooldown > 0) return;
+    
+    // Only smash if ball is close to player 1's paddle and moving toward them
+    const ballDistance = Math.abs(gameState.ball.x - paddle.width);
+    if (ballDistance < 100 && ball.dx < 0) {
+        // Make ball go straight forward and fast (toward player 2)
+        ball.dx = Math.abs(ball.speed * 2.5); // Much faster, always positive (right)
+        ball.dy = (Math.random() - 0.5) * 2; // Mostly straight with slight variation
+        
+        canSmash = false;
+        smashCooldown = 60; // Cooldown frames (1 second at 60fps)
+        
+        console.log('SMASH!');
+    }
+}
 
 // Predict where ball will land on AI's side
 function predictBallLanding() {
@@ -148,6 +186,14 @@ function predictBallLanding() {
 
 // Game loop
 function update() {
+    // Update smash cooldown
+    if (smashCooldown > 0) {
+        smashCooldown--;
+        if (smashCooldown === 0) {
+            canSmash = true;
+        }
+    }
+    
     // Move player 1 paddle
     if (keys.ArrowUp && gameState.player1.y > 0) {
         gameState.player1.y -= paddle.speed;
@@ -156,35 +202,54 @@ function update() {
         gameState.player1.y += paddle.speed;
     }
 
-    // AI for player 2 paddle with prediction
-    const difficulty = difficulties[currentDifficulty];
-    
-    // Update AI target with reaction delay
-    if (aiReactionTimer <= 0) {
-        aiTargetY = predictBallLanding();
-        aiReactionTimer = difficulty.reactionFrames;
-    } else {
-        aiReactionTimer--;
-    }
-    
-    // Move AI paddle toward predicted position
-    const paddleCenter = gameState.player2.y + paddle.height / 2;
-    const aiSpeed = difficulty.maxSpeed;
-    
-    if (Math.abs(paddleCenter - aiTargetY) > 5) {
-        if (paddleCenter < aiTargetY) {
-            gameState.player2.y += aiSpeed;
+    // Player 2 control (AI or human)
+    if (gameMode === 'ai') {
+        // AI for player 2 paddle with prediction
+        const difficulty = difficulties[currentDifficulty];
+        
+        // Update AI target with reaction delay
+        if (aiReactionTimer <= 0) {
+            aiTargetY = predictBallLanding();
+            aiReactionTimer = difficulty.reactionFrames;
         } else {
-            gameState.player2.y -= aiSpeed;
+            aiReactionTimer--;
         }
-    }
-    
-    // Keep AI paddle within bounds
-    if (gameState.player2.y < 0) {
-        gameState.player2.y = 0;
-    }
-    if (gameState.player2.y > canvas.height - paddle.height) {
-        gameState.player2.y = canvas.height - paddle.height;
+        
+        // Move AI paddle toward predicted position
+        const paddleCenter = gameState.player2.y + paddle.height / 2;
+        const aiSpeed = difficulty.maxSpeed;
+        
+        if (Math.abs(paddleCenter - aiTargetY) > 5) {
+            if (paddleCenter < aiTargetY) {
+                gameState.player2.y += aiSpeed;
+            } else {
+                gameState.player2.y -= aiSpeed;
+            }
+        }
+        
+        // Keep AI paddle within bounds
+        if (gameState.player2.y < 0) {
+            gameState.player2.y = 0;
+        }
+        if (gameState.player2.y > canvas.height - paddle.height) {
+            gameState.player2.y = canvas.height - paddle.height;
+        }
+    } else {
+        // Multiplayer: W/S keys for player 2
+        if (keys.KeyW && gameState.player2.y > 0) {
+            gameState.player2.y -= paddle.speed;
+        }
+        if (keys.KeyS && gameState.player2.y < canvas.height - paddle.height) {
+            gameState.player2.y += paddle.speed;
+        }
+        
+        // Keep player 2 paddle within bounds
+        if (gameState.player2.y < 0) {
+            gameState.player2.y = 0;
+        }
+        if (gameState.player2.y > canvas.height - paddle.height) {
+            gameState.player2.y = canvas.height - paddle.height;
+        }
     }
 
     // Move ball
@@ -275,6 +340,34 @@ function gameLoop() {
     draw();
     requestAnimationFrame(gameLoop);
 }
+
+// Mode selector event handlers
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const newMode = btn.dataset.mode;
+        
+        // Update active button
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update mode
+        gameMode = newMode;
+        
+        // Toggle difficulty selector and help text visibility
+        const difficultySelector = document.getElementById('difficulty-selector');
+        const player2Help = document.getElementById('player2-help');
+        
+        if (gameMode === 'multiplayer') {
+            difficultySelector.classList.add('hidden');
+            player2Help.classList.remove('hidden');
+        } else {
+            difficultySelector.classList.remove('hidden');
+            player2Help.classList.add('hidden');
+        }
+        
+        console.log(`Mode changed to: ${newMode}`);
+    });
+});
 
 // Difficulty selector event handlers
 document.querySelectorAll('.difficulty-btn').forEach(btn => {

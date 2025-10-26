@@ -13,10 +13,16 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    gap: 15px;
 }
 
-#difficulty-selector {
+#controls-panel {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+}
+
+#mode-selector, #difficulty-selector {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -24,7 +30,12 @@ body {
     font-size: 16px;
 }
 
-.difficulty-btn {
+#difficulty-selector.hidden {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.mode-btn, .difficulty-btn {
     padding: 8px 16px;
     background-color: #333;
     color: white;
@@ -36,9 +47,14 @@ body {
     transition: all 0.3s;
 }
 
-.difficulty-btn:hover {
+.mode-btn:hover, .difficulty-btn:hover {
     background-color: #444;
     border-color: #888;
+}
+
+.mode-btn.active {
+    background-color: #2196F3;
+    border-color: #2196F3;
 }
 
 .difficulty-btn.active {
@@ -48,8 +64,19 @@ body {
 
 #score {
     color: white;
-    font-size: 24px;
+    font-size: 28px;
     font-weight: bold;
+}
+
+#controls-help {
+    display: flex;
+    gap: 40px;
+    color: #aaa;
+    font-size: 13px;
+}
+
+#player2-help.hidden {
+    display: none;
 }
 
 #gameCanvas {
