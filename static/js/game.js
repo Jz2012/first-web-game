@@ -20,6 +20,35 @@ const ball = {
     dy: 5
 };
 
+// Difficulty configurations
+const difficulties = {
+    easy: {
+        name: 'Easy',
+        maxSpeed: 2.5,
+        reactionFrames: 15,
+        predictionError: 40,
+        mistakeChance: 0.15
+    },
+    medium: {
+        name: 'Medium',
+        maxSpeed: 3.5,
+        reactionFrames: 8,
+        predictionError: 20,
+        mistakeChance: 0.08
+    },
+    hard: {
+        name: 'Hard',
+        maxSpeed: 5,
+        reactionFrames: 3,
+        predictionError: 5,
+        mistakeChance: 0.02
+    }
+};
+
+let currentDifficulty = 'easy';
+let aiReactionTimer = 0;
+let aiTargetY = canvas.height / 2;
+
 let gameState = {
     player1: {
         y: canvas.height / 2 - paddle.height / 2,
@@ -68,6 +97,55 @@ socket.on('paddle_update', (data) => {
     }
 });
 
+// Predict where ball will land on AI's side
+function predictBallLanding() {
+    const difficulty = difficulties[currentDifficulty];
+    
+    // Only predict if ball is moving toward AI
+    if (ball.dx <= 0) {
+        return gameState.ball.y;
+    }
+    
+    // Simulate ball trajectory
+    let simX = gameState.ball.x;
+    let simY = gameState.ball.y;
+    let simDx = ball.dx;
+    let simDy = ball.dy;
+    
+    // Simulate until ball reaches AI's x position
+    let iterations = 0;
+    const maxIterations = 500;
+    
+    while (simX < canvas.width - paddle.width && iterations < maxIterations) {
+        simX += simDx;
+        simY += simDy;
+        iterations++;
+        
+        // Handle top/bottom wall bounces
+        if (simY <= 0 || simY >= canvas.height) {
+            simDy *= -1;
+            simY = Math.max(0, Math.min(canvas.height, simY));
+        }
+        
+        // Safety check
+        if (simX > canvas.width * 2) break;
+    }
+    
+    // Add prediction error based on difficulty
+    const error = (Math.random() - 0.5) * difficulty.predictionError;
+    let targetY = simY + error;
+    
+    // Random mistakes
+    if (Math.random() < difficulty.mistakeChance) {
+        targetY += (Math.random() - 0.5) * 100;
+    }
+    
+    // Keep target within bounds
+    targetY = Math.max(paddle.height / 2, Math.min(canvas.height - paddle.height / 2, targetY));
+    
+    return targetY;
+}
+
 // Game loop
 function update() {
     // Move player 1 paddle
@@ -78,14 +156,27 @@ function update() {
         gameState.player1.y += paddle.speed;
     }
 
-    // AI for player 2 paddle
-    const paddleCenter = gameState.player2.y + paddle.height / 2;
-    const aiSpeed = 3.5;
+    // AI for player 2 paddle with prediction
+    const difficulty = difficulties[currentDifficulty];
     
-    if (paddleCenter < gameState.ball.y - 10) {
-        gameState.player2.y += aiSpeed;
-    } else if (paddleCenter > gameState.ball.y + 10) {
-        gameState.player2.y -= aiSpeed;
+    // Update AI target with reaction delay
+    if (aiReactionTimer <= 0) {
+        aiTargetY = predictBallLanding();
+        aiReactionTimer = difficulty.reactionFrames;
+    } else {
+        aiReactionTimer--;
+    }
+    
+    // Move AI paddle toward predicted position
+    const paddleCenter = gameState.player2.y + paddle.height / 2;
+    const aiSpeed = difficulty.maxSpeed;
+    
+    if (Math.abs(paddleCenter - aiTargetY) > 5) {
+        if (paddleCenter < aiTargetY) {
+            gameState.player2.y += aiSpeed;
+        } else {
+            gameState.player2.y -= aiSpeed;
+        }
     }
     
     // Keep AI paddle within bounds
@@ -103,6 +194,8 @@ function update() {
     // Ball collision with top and bottom
     if (gameState.ball.y <= 0 || gameState.ball.y >= canvas.height) {
         ball.dy *= -1;
+        // Clamp ball position to prevent going out of bounds
+        gameState.ball.y = Math.max(0, Math.min(canvas.height, gameState.ball.y));
     }
 
     // Ball collision with paddles
@@ -182,6 +275,23 @@ function gameLoop() {
     draw();
     requestAnimationFrame(gameLoop);
 }
+
+// Difficulty selector event handlers
+document.querySelectorAll('.difficulty-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const newDifficulty = btn.dataset.difficulty;
+        
+        // Update active button
+        document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update difficulty
+        currentDifficulty = newDifficulty;
+        aiReactionTimer = 0;
+        
+        console.log(`Difficulty changed to: ${difficulties[currentDifficulty].name}`);
+    });
+});
 
 // Start the game
 gameLoop();
