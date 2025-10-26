@@ -31,10 +31,11 @@ A multiplayer ping pong game built with Flask and Socket.IO for real-time gamepl
 ```
 
 ## Key Features
-- Real-time multiplayer gameplay using WebSockets
+- Single-player game with AI opponent
 - Canvas-based game rendering
 - Score tracking for both players
-- Keyboard controls (Arrow Up/Down)
+- Keyboard controls for player (Arrow Up/Down)
+- AI-controlled opponent that follows the ball
 - Ball physics with paddle collision detection
 - Automatic ball reset after scoring
 
@@ -44,13 +45,15 @@ A multiplayer ping pong game built with Flask and Socket.IO for real-time gamepl
 - python-engineio (>=4.8.0) - Engine.IO protocol
 - python-socketio (>=5.10.0) - Socket.IO protocol
 
-## Recent Changes (Oct 25, 2025)
+## Recent Changes (Oct 26, 2025)
 - Imported project from GitHub
 - Updated dependencies to use Flask 3.x for compatibility with Werkzeug 3.x
 - Configured server to run on 0.0.0.0:5000 for Replit environment
 - Added allow_unsafe_werkzeug flag for development server
 - Created .gitignore for Python projects
 - Set up workflow for automatic server startup
+- Added AI opponent that automatically tracks and follows the ball
+- AI speed tuned to 3.5 (vs player 5.0) for balanced difficulty
 
 ## Running the Project
 The Flask server is configured to run automatically via the Replit workflow system. The game will be accessible through the Replit webview on port 5000.

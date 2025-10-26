@@ -70,12 +70,30 @@ socket.on('paddle_update', (data) => {
 
 // Game loop
 function update() {
-    // Move paddles
+    // Move player 1 paddle
     if (keys.ArrowUp && gameState.player1.y > 0) {
         gameState.player1.y -= paddle.speed;
     }
     if (keys.ArrowDown && gameState.player1.y < canvas.height - paddle.height) {
         gameState.player1.y += paddle.speed;
+    }
+
+    // AI for player 2 paddle
+    const paddleCenter = gameState.player2.y + paddle.height / 2;
+    const aiSpeed = 3.5;
+    
+    if (paddleCenter < gameState.ball.y - 10) {
+        gameState.player2.y += aiSpeed;
+    } else if (paddleCenter > gameState.ball.y + 10) {
+        gameState.player2.y -= aiSpeed;
+    }
+    
+    // Keep AI paddle within bounds
+    if (gameState.player2.y < 0) {
+        gameState.player2.y = 0;
+    }
+    if (gameState.player2.y > canvas.height - paddle.height) {
+        gameState.player2.y = canvas.height - paddle.height;
     }
 
     // Move ball
