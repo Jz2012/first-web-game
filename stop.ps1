@@ -11,7 +11,7 @@ if (Test-Path .\server.pid) {
             Remove-Item .\server.pid -ErrorAction SilentlyContinue
             Write-Host "Process $pid stopped and server.pid removed."
         } catch {
-            Write-Warning "Failed to stop process $pid: $_"
+            Write-Warning ("Failed to stop process {0}: {1}" -f $pid, $_)
         }
     } else {
         Write-Warning "server.pid does not contain a valid PID"
